@@ -14,7 +14,7 @@ Labs and resources from MIT 6.S081 (6.828, 6.1800) course in 2021 Fall.
 
 *Some notes taken during the coding and thinking.*
 
-## Lab Utilities
+## [Lab Utilities](https://pdos.csail.mit.edu/6.828/2021/labs/util.html)
 
 ### primes
 use pipe and fork to set up the pipeline. The first process feeds the numbers 2 through 35 into the pipeline. For each prime number, you will arrange to create one process that reads from its left neighbor over a pipe and writes to its right neighbor over another pipe. 
