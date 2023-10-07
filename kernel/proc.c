@@ -141,6 +141,9 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  // clear all traces
+  p->mask_bits = 0;
+
   return p;
 }
 
@@ -302,6 +305,8 @@ fork(void)
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
+
+  np->mask_bits = p->mask_bits;
 
   pid = np->pid;
 
