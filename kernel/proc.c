@@ -56,6 +56,18 @@ procinit(void)
   }
 }
 
+// Return the number of used processes
+uint64
+nproc(void) {
+  uint num = 0;
+  struct proc *p;
+  for (p = proc; p < &proc[NPROC]; p++) {
+    if (p->state != UNUSED)
+      num++;
+  }
+  return num;
+}
+
 // Must be called with interrupts disabled,
 // to prevent race with process being moved
 // to a different CPU.
