@@ -1,6 +1,8 @@
 # 6.S081-2021
 Labs and resources from MIT 6.S081 (6.828, 6.1800) course in 2021 Fall.
 
+> Check branches for source code
+
 ## About this course
 - *tags*: **operating system**, **risc-v**, **C**
 - *study time*: 2023 Fall
