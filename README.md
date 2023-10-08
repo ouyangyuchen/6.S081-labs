@@ -44,3 +44,26 @@ set up a state machine for **all child processes**:
   Finally, the last process terminates. And all waiting parent processes will terminate one by one.
 
 - All child processes should explicitly **wait for its own chlid** before exiting. This behavior guarantees the terminating order and printing correctness.
+
+## [Lab System Calls](https://pdos.csail.mit.edu/6.828/2021/labs/syscall.html)
+This lab shows us how to create a system call and use definitions in kernel code.
+
+### Activate a system call in xv6
+
+1. **ecall \<num\>** - There is a function declaration in `user/user.h`, a system call number in `kernel/syscall.h` and a stub to `user/usys.pl` (which generates user-level syscall instructions).
+2. **jump to syscall()** - `ecall` will jump to the `syscall()` function in `kernel/syscall.c` with the calling number saved in `a7` register.
+3. **syscall() calls corresponding kernel code** - `syscall()` use the number as an index of a function pointer array to get the address of its kernel code and call it.
+4. **execute kernel code** - Execute the actual kernel system call, ex. `sys_fork()`, in `kernel/sysproc.c` and other files.
+
+### Tracing
+Add an mask integer in process structure. When the actual system call returns to `syscall()`, test the process mask with the system call number and print a line.
+
+> How to pass the mask to child processes?
+- Initial every process with an empty mask while allocating.
+- The `sys_trace()` writes the mask integer of process from its argument. If the user doesn't call `trace()`, all processes will have empty masks and hence avoid printing lines.
+- `fork()` will copy mask number to the child process.
+
+### Sysinfo
+- *freemem* - Traverse the free page list and get the result by multiplying `PGSIZE`.
+- *nproc* - Traverse the process array and count the number of used ones.
+- `sys_sysinfo()` copy the result numbers to the given address by calling `copyout()`.
