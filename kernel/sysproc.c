@@ -76,14 +76,21 @@ sys_sleep(void)
 }
 
 
-#ifdef LAB_PGTBL
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
-  return 0;
+  uint64 va;
+  int pages;
+  uint64 dest;
+  if (argaddr(0, &va) < 0)
+    return -1;
+  if (argint(1, &pages) < 0)
+    return -1;
+  if (argaddr(2, &dest) < 0)
+    return -1;
+  int res = pgaccess(va, pages, (void *)dest);
+  return res;
 }
-#endif
 
 uint64
 sys_kill(void)

@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -431,4 +433,65 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+static void 
+vmprint_helper(pagetable_t pagetable, int level) {
+  // level = 2: ' ..'
+  // level = 1: ' .. ..'
+  // level = 0: ' .. .. ..'
+  char prefix[(3-level) * 3 + 1];
+  prefix[(3-level) * 3] = 0;
+  for (int i = 0; i < (3-level) * 3; i += 3) {
+    prefix[i] = ' ';
+    prefix[i+1] = '.';
+    prefix[i+2] = '.';
+  }
+
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if (pte & PTE_V) {
+      printf("%s%d: pte %p pa %p\n", prefix, i, pte, PTE2PA(pte));
+      if ((pte & (PTE_R|PTE_W|PTE_X)) == 0) {
+        // pte contains the pa of sub-pagetable
+        vmprint_helper((pagetable_t)PTE2PA(pte), level - 1);
+      }
+    }
+  }
+}
+
+void
+vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", pagetable);
+  vmprint_helper(pagetable, 2);
+} 
+
+int
+pgaccess(uint64 va, int pages, void *dest) {
+  if (pages < 0 || pages > 1024) return -1;
+
+  char mask[(pages + 7) >> 3];
+  memset(mask, 0, sizeof(mask));    // clear all bits first
+
+  struct proc *p = myproc();
+  pagetable_t pagetable = p->pagetable;
+
+  uint64 start = PGROUNDDOWN(va);
+
+  for (int i = 0; i < pages; i++) {
+    uint64 a = start + i * PGSIZE;
+
+    // check whether the pte is valid
+    pte_t* pte;
+    if ((pte = walk(pagetable, a, 0)) == 0)
+      continue;
+    if ((*pte & PTE_V) == 0)
+      continue;
+
+    if (*pte & PTE_A)
+      mask[i / 8] |= (1L << (i % 8));     // set corresponding bit = 1
+    *pte &= ~PTE_A;     // clear PTE_A after checking
+  }
+
+  return copyout(pagetable, (uint64)dest, mask, sizeof(mask));
 }
