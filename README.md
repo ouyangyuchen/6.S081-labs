@@ -18,7 +18,7 @@ Labs and resources from MIT 6.S081 (6.828, 6.1800) course in 2021 Fall.
 
 ## [Lab Utilities](https://pdos.csail.mit.edu/6.828/2021/labs/util.html)
 
-### primes
+### primes (hard)
 use pipe and fork to set up the pipeline. The first process feeds the numbers 2 through 35 into the pipeline. For each prime number, you will arrange to create one process that reads from its left neighbor over a pipe and writes to its right neighbor over another pipe. 
 
 ![image](https://github.com/ouyangyuchen/6.S081-labs/assets/107864216/3a13c876-e3cd-4c7b-a8f3-654548d9cbc7)
@@ -67,3 +67,34 @@ Add an mask integer in process structure. When the actual system call returns to
 - *freemem* - Traverse the free page list and get the result by multiplying `PGSIZE`.
 - *nproc* - Traverse the process array and count the number of used ones.
 - `sys_sysinfo()` copy the result numbers to the given address by calling `copyout()`.
+
+## [Lab Page Tables](https://pdos.csail.mit.edu/6.828/2021/labs/pgtbl.html)
+In this lab, the most important reference is `kernel/vm.c`, which relates to the creation, mapping, and freeing of page tables.
+Among all the functions in `vm.c`, three are the most useful in this lab:
+1. `int mappages()`: Setup the page table entries with physical address usually used with `kalloc()`.
+2. `pte *walk()`: Fetch or create the corresponding page table entry in the three-level tree.
+3. `void uvmunmap()`: Unmap vm pages by writing the page table entries to 0, optionally free the pointed physical memory.
+
+### Speed up system calls
+We can map a new **read-only** (dont't forget `PTE_U`) page at va=`USYSCALL`, and store the information in the pointed physical page.
+
+If user calls `ugetpid()`, function will directly return the pid stored at `USYSCALL` in user mode, instead of asking kernel to return `getpid()`.
+
+### Print a page table
+Essentially this is a pre-order traversal in N-ary tree. You can imagine:
+1. Every pagetable is a node, and each pte is a link to one child node.
+2. If the pte is valid and labeld as `*pte & (PTE_W|PTE_R|PTE_X) == 0`, then this node is an internal node.
+3. Recursively call `vmprint()` for internal nodes after printing the lines.
+
+The indentation level can be passed as the second argument in the recursive function. You can construct the prefix string before traversing.
+
+### Detecting which pages have been accessed (hard)
+I think this task is easy level because it is quite straight-forward.
+
+1. Call multiple `walk()` functions in the given range.
+2. For each pte returned, check whether the `PTE_A` bit is set and clear it.
+3. Set the corresponding bit based on the for loop counter `i` and shifting.
+4. `copyout` the bitmask to the destination user address.
+
+My suggestion is **setting a small size for the bitmask** (like 64 or 128) or you can allocate space from the input number (I use this approach).
+If you set the size too much, like 512 or 1024, the kernel stack will probably overflow and you can see a bizarre bug about page fault and spend several hours on it (just like I did).
