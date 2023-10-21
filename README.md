@@ -83,7 +83,7 @@ If user calls `ugetpid()`, function will directly return the pid stored at `USYS
 ### Print a page table
 Essentially this is a pre-order traversal in N-ary tree. You can imagine:
 1. Every pagetable is a node, and each pte is a link to one child node.
-2. If the pte is valid and labeld as `*pte & (PTE_W|PTE_R|PTE_X) == 0`, then this node is an internal node.
+2. If the pte is valid and labeled as `*pte & (PTE_W|PTE_R|PTE_X) == 0`, then this node is an internal node.
 3. Recursively call `vmprint()` for internal nodes after printing the lines.
 
 The indentation level can be passed as the second argument in the recursive function. You can construct the prefix string before traversing.
