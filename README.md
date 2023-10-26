@@ -5,7 +5,7 @@ Labs and resources from MIT 6.S081 (6.828, 6.1800) course in 2021 Fall.
 
 ## About this course
 - *tags*: **operating system**, **risc-v**, **C**
-- *study time*: 2023 Fall
+- *study semester*: 2021 Fall
 - *course homepage*: [6.S081 / Fall 2021](https://pdos.csail.mit.edu/6.828/2021/schedule.html)
 - *Textbook*: [xv6 book](https://pdos.csail.mit.edu/6.828/2021/xv6/book-riscv-rev2.pdf)
 
