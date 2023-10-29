@@ -135,11 +135,11 @@ If you have a look at `proc.h`, you will find there is space in the trapframe (4
 Therefore, before `usertrapret()`, we should copy all registers to the new temporary area (including epc, the original one) and change epc above to our handler address.
 Even if the handler uses many registers, we still have a copy for each one below. 
 
-When the handler is going to return, it is forced to add a system call `sigreturn` to kernel space. In this system call, we restore the original context
-by simply copying back the memory below and calling `usertrapret()`. Where are we going to now? Of course, the original epc register, also the interrupted user pc!
+When the handler is going to return, it is forced to add a system call `sigreturn`, returning to kernel space. In this system call, we restore the original context
+by simply copying back the memory below and calling `usertrapret()`. Where are we going to now? Of course, the original epc register, also is the user pc when the interruption occurs.
 
 **test2**
 
-Add a lock flag in process struct, and initialize it to 0 in `allocproc()`.
+Add a lock flag in process struct, and initialize it to open state in `allocproc()`.
 
 Lock it before copying the registers, unlock it when `sigreturn` returns.
