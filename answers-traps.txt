@@ -1,0 +1,12 @@
+1. a0, a1, a2 ... registers. a2 holds 13 for printf call in main().
+
+2. va=0x26 calls f(8)+1 in main(), va=0x14 calls g()
+
+3. 0x628
+
+4. 0x34
+
+5. He110 World
+big-endian: i = 0x726c6400, 57616 is not changed
+
+6. the lower 32-bit value in a2 register
