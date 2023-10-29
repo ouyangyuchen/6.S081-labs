@@ -78,6 +78,7 @@ struct trapframe {
   /* 264 */ uint64 t4;
   /* 272 */ uint64 t5;
   /* 280 */ uint64 t6;
+  /* 288 */ uint64 tempreg[40];   // save all registers to this area when calling tick handler
 };
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
@@ -105,4 +106,9 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  int TICKS;             // ticks argument for sigalarm()
+  int ticks;                   // ticks have passed since the last call
+  uint64 handler;              // handler va in user space
+  int handler_lock;            // lock the handler if it is executing
 };
