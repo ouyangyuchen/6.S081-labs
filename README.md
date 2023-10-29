@@ -1,7 +1,7 @@
 # 6.S081-2021
-Labs and resources from MIT 6.S081 (6.828, 6.1800) course in 2021 Fall.
+Labs and resources from MIT 6.S081 (6.828, 6.1800) course in 2021 Fall. 
 
-> Check branches for source code
+master branch only keeps the notes in `README.md`. **Please switch the *branch* if you want to check source code for the corresponding lab.**
 
 ## About this course
 - *tags*: **operating system**, **risc-v**, **C**
@@ -14,7 +14,8 @@ Labs and resources from MIT 6.S081 (6.828, 6.1800) course in 2021 Fall.
 - [risc-v calling convention](https://pdos.csail.mit.edu/6.828/2021/readings/riscv-calling.pdf)
 - [QEMU Manual](https://wiki.qemu.org/Documentation), risc-v machine emulation platform
 
-*Some notes taken during the coding and thinking.*
+---
+Here are my notes and thoughts for all labs.
 
 ## [Lab Utilities](https://pdos.csail.mit.edu/6.828/2021/labs/util.html)
 
@@ -98,3 +99,47 @@ I think this task is easy level because it is quite straight-forward.
 
 My suggestion is **setting a small size for the bitmask** (like 64 or 128) or you can allocate space from the input number (I use this approach).
 If you set the size too much, like 512 or 1024, the kernel stack will probably overflow and you can see a bizarre bug about page fault and spend several hours on it (just like I did).
+
+## [Lab Traps](https://pdos.csail.mit.edu/6.828/2021/labs/traps.html)
+The `uservec` code in `kernel/trampoline.S` is used for 2 things:
+1. switch the page table from user space to kernel space.
+2. save all the general registers to trapframe page (per process)
+3. jump to `usertrap()`.
+
+`usertrap()` in `user/trap.c` is to handle the exception based on the `sscause` number: syscall, device interrupt, timer interrupt, other faults.
+`usertrap()` then jumps to `usertrapret()` for configuring the trapframe head information, ex. kernel page table address, hartid ...
+
+Then `userret` in the `trampoline.S` will do the reverse things in `uservec` and return to user mode by calling `sret`.
+
+### Alarm (hard)
+This lab requires us to **jump to a user function when the tick number passes the given limit**, and **restore the context when the handler returns**. 
+
+**test0**
+
+We can add some fields in process structure to store ticks, limit, and handler address.
+When the condition is triggered (ticks is big enough), we need to write the handler address to pc register, right?. No! This will certainly fails, because:
+
+> `usertrap` is in kernel address space. We cannot use user address directly!
+
+We need to ask `usertrapret()` for help, which is also in kernel space.
+It can help us jump back to the user space and restore the context saved in trapframe, including the pc register.
+
+Therefore, we can change the epc register in trapframe to the handler address. And we call `usertrapret()`, kernel will do the right things for us.
+
+**test1**
+
+Now the 1st problem is solved, how about the next one? You may have noticed that all registers restored by `userret` will be corrupted by the handler rountine,
+thus we can't safely jump back to the user code. So another question goes that where we can store the saved registers so that we can copy them back? 
+If you have a look at `proc.h`, you will find there is space in the trapframe (4096) to store all registers (288), we can save them just beneath the original saving area.
+
+Therefore, before `usertrapret()`, we should copy all registers to the new temporary area (including epc, the original one) and change epc above to our handler address.
+Even if the handler uses many registers, we still have a copy for each one below. 
+
+When the handler is going to return, it is forced to add a system call `sigreturn` to kernel space. In this system call, we restore the original context
+by simply copying back the memory below and calling `usertrapret()`. Where are we going to now? Of course, the original epc register, also the interrupted user pc!
+
+**test2**
+
+Add a lock flag in process struct, and initialize it to 0 in `allocproc()`.
+
+Lock it before copying the registers, unlock it when `sigreturn` returns.
