@@ -303,7 +303,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  // char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -312,13 +312,24 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    // map page table entry
+    if(mappages(new, i, PGSIZE, pa, flags) != 0){
       goto err;
     }
+    pte_t *new_pte = walk(new, i, 0);
+    if (new_pte == 0) {
+      printf("uvmcopy: new pte not exists\n");
+      goto err;
+    }
+    // update flags: clear write, set cow
+    if (*pte & PTE_W) {
+      *pte &= ~PTE_W;
+      *new_pte &= ~PTE_W;
+      *pte |= PTE_COW;
+      *new_pte |= PTE_COW;
+    }
+    // phyical page reference +1
+    refcnt[REFINDEX(pa)]++;
   }
   return 0;
 
@@ -347,12 +358,21 @@ int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
+  pte_t *pte;
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
+    if (va0 > MAXVA)
       return -1;
+    pte = walk(pagetable, va0, 0);
+    // pte found?
+    if (pte == 0 || (*pte & PTE_V) == 0)
+      return -1;
+    // cow case or normal case?
+    if ((*pte & PTE_COW) && cow_handler(pagetable, va0) < 0)
+      return -1;
+
+    pa0 = walkaddr(pagetable, va0);
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
@@ -431,4 +451,38 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+// given the pgtbl and faulting virtual address,
+// handler allocates a new write page and copies the memory, update the pgtbl,
+// and reset the write and cow bits. return -1 if error
+int
+cow_handler(pagetable_t pagetable, uint64 va) {
+  pte_t* pte;
+  // check va is out of bound
+  if (va >= MAXVA) {
+    return -1;    
+  }
+  // get the pte of faulting va
+  if ((pte = walk(pagetable, va, 0)) == 0) {
+    return -1;
+  }
+  if (*pte & PTE_COW) {
+    uint64 new_pa = (uint64)kalloc(); // allocate a new page
+    if (new_pa == 0) {
+      return -1;
+    }
+
+    uint64 old_pa = PTE2PA(*pte);
+    memmove((void *)new_pa, (void *)old_pa, PGSIZE);  // copy memory
+    kfree((void *)old_pa);    // decrease the reference, free the old page if ref=0
+
+    *pte &= ~PTE_COW; // clear cow flag
+    *pte |= PTE_W; // set write flag back
+    *pte = PA2PTE(new_pa) | PTE_FLAGS(*pte);
+  }
+  else {
+    return -1;
+  }
+  return 0;
 }
