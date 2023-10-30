@@ -362,17 +362,17 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
-    if (va0 > MAXVA)
-      return -1;
-    pte = walk(pagetable, va0, 0);
-    // pte found?
-    if (pte == 0 || (*pte & PTE_V) == 0)
-      return -1;
-    // cow case or normal case?
-    if ((*pte & PTE_COW) && cow_handler(pagetable, va0) < 0)
+    pa0 = walkaddr(pagetable, va0);
+    // validate every va in the range
+    if (pa0 == 0)
       return -1;
 
-    pa0 = walkaddr(pagetable, va0);
+    pte = walk(pagetable, va0, 0);
+    // if dest page is cow, call page fault handler to allocate new page
+    if ((*pte & PTE_COW) && cow_handler(pagetable, va0) < 0)
+      return -1;
+    pa0 = walkaddr(pagetable, va0);   // update phyical address for cow case
+
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
@@ -470,12 +470,13 @@ cow_handler(pagetable_t pagetable, uint64 va) {
   if (*pte & PTE_COW) {
     uint64 new_pa = (uint64)kalloc(); // allocate a new page
     if (new_pa == 0) {
+      // memory not enough
       return -1;
     }
 
     uint64 old_pa = PTE2PA(*pte);
-    memmove((void *)new_pa, (void *)old_pa, PGSIZE);  // copy memory
-    kfree((void *)old_pa);    // decrease the reference, free the old page if ref=0
+    memmove((void *)new_pa, (void *)old_pa, PGSIZE);  // copy page
+    kfree((void *)old_pa);    // ref--, free the old page if ref=0
 
     *pte &= ~PTE_COW; // clear cow flag
     *pte |= PTE_W; // set write flag back

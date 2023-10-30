@@ -68,7 +68,8 @@ usertrap(void)
 
     syscall();
   } else if (scause == 15) {
-    uint64 fva = r_stval();
+    // store page fault
+    uint64 fva = r_stval();   // stval <- faulting va
     if (cow_handler(p->pagetable, fva) < 0)
       p->killed = 1;
   } else if((which_dev = devintr()) != 0){
