@@ -147,3 +147,53 @@ by simply copying back the memory below and calling `usertrapret()`. Where are w
 Add a lock flag in process struct, and initialize it to open state in `allocproc()`.
 
 Lock it before copying the registers, unlock it when `sigreturn` returns.
+
+## [Lab Copy-on-Write](https://pdos.csail.mit.edu/6.828/2021/labs/cow.html)
+We need to implement copy-on-write optimization in fork calls. Let's follow the hints:
+
+When user calls `fork()`, a new process will create a new page table (`uvmcopy()`), which contains the same ptes as the parent. And we clear the write flag `PTE_W` for every valid page in both tables. Is this enough? Let's move on and leave it okay temporarily.
+
+### Copy page table
+So next, a store instruction in user code causes a store page fault `scause = 15`, we go into the `usertrap()` routine, a general exception handler.
+We then retrieve the faulting virtual address from `stval` register and walk through the page table to find the cause.
+Suppose we perfectly find it, now shall we allocate a new page and restore the writing bit? Wait!!!
+If this page was read-only before copying, now we have a writable page in one of the processes, that's horrible!
+
+Now the question comes, *how can you decide the page is originally read-only or r/w?* So we need to do something in the `uvmcopy()` so that
+it is easy to distinguish the type.
+My solution is using a bit in the Reserved-for-SoftWare area:
+```c
+#define PTE_COW (1L << 8)  // 1: cow page, 0: read-only page
+```
+<p align="center">
+<img src="./assets/pte.png" alt="pte39" width="700" />
+</p>
+
+When copying the page table, we only **set the cow bit if this page was writable** for both tables.
+Now we are trapped in the page fault handler, we can allocate pages only for the cow ones and leave the read-only ones just there.
+Don't forget reset the flag bits:
+```c
+*pte |= PTE_W;
+*pte &= ~PTE_COW; // not cow any more, avoid causing another copy
+```
+
+The faulting process restarts the store instruction, and this time it is writable.
+
+### Add reference counts
+Now the user wants to terminate its process, and kernel calls `uvmfree()` in `kernel/vm.c` file.
+The `do_free` option is set in the `uvmunmap()` function, and we free all physical pages belonging to the process.
+
+What about the read-only pages that have multiple mappings? If one process frees it, any other process have no access to this physical page.
+That's why **we need to record the number of references to every physical page allocated by `kalloc()`**. (kernel data and text are excluded)
+We only free the pages having no references.
+
+How can we maintain this data structure? In my solution, just a `uint` array that have the same number entries as physical pages.
+
+- `kalloc()` set the count number to 1 before returning.
+- `kfree()` decrements the count by 1. If it is 0, we actually free this page.
+- `uvmcopy` increments the corresponding count number for each page by 1.
+- Page fault handler calls `kfree(old_pa)` after updating the pte and copying memory.
+
+This approach requires few changes in the code: The kernel calls `kfree()` just as usual when freeing the process;
+If the cow page has only one external reference and that process is going to write, kernel simply allocates a new physical page
+and free the old one, which avoids the complicated judging code.
