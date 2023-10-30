@@ -22,11 +22,11 @@ Here are my notes and thoughts for all labs.
 ### primes (hard)
 use pipe and fork to set up the pipeline. The first process feeds the numbers 2 through 35 into the pipeline. For each prime number, you will arrange to create one process that reads from its left neighbor over a pipe and writes to its right neighbor over another pipe. 
 
-![image](https://github.com/ouyangyuchen/6.S081-labs/assets/107864216/3a13c876-e3cd-4c7b-a8f3-654548d9cbc7)
+![prime](./assets/prime.png)
 
 set up a state machine for **all child processes**:
 
-![未命名绘图 drawio](https://github.com/ouyangyuchen/6.S081-labs/assets/107864216/28a031db-4222-44fb-8a43-4ad899e60382)
+![primesm](./assets/prime_sm.png)
 
 - What does main process do?
 
