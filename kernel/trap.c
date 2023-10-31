@@ -70,8 +70,22 @@ usertrap(void)
   } else if (scause == 15) {
     // store page fault
     uint64 fva = r_stval();   // stval <- faulting va
-    if (cow_handler(p->pagetable, fva) < 0)
+    pte_t *pte;
+    int flag = is_cow(p->pagetable, fva);
+    if (flag < 0) {
+      // not valid or read-only page
       p->killed = 1;
+    }
+    else if (flag == 0) {
+      // writable page but with storing pgfault
+      panic("pgfault: writable page triggers\n");
+    }
+    else {
+      // copy-on-write page
+      pte = walk(p->pagetable, fva, 0);
+      if (cow_alloc(pte) == 0)
+        p->killed = 1;
+    }
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
