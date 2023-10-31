@@ -459,14 +459,12 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 int
 cow_handler(pagetable_t pagetable, uint64 va) {
   pte_t* pte;
-  // check va is out of bound
-  if (va >= MAXVA) {
-    return -1;    
-  }
-  // get the pte of faulting va
-  if ((pte = walk(pagetable, va, 0)) == 0) {
+  uint64 old_pa = walkaddr(pagetable, va);
+  if (old_pa == 0)
     return -1;
-  }
+
+  // get the pte of faulting va
+  pte = walk(pagetable, va, 0);
   if (*pte & PTE_COW) {
     uint64 new_pa = (uint64)kalloc(); // allocate a new page
     if (new_pa == 0) {
@@ -474,7 +472,6 @@ cow_handler(pagetable_t pagetable, uint64 va) {
       return -1;
     }
 
-    uint64 old_pa = PTE2PA(*pte);
     memmove((void *)new_pa, (void *)old_pa, PGSIZE);  // copy page
     kfree((void *)old_pa);    // ref--, free the old page if ref=0
 
