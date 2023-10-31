@@ -358,20 +358,24 @@ int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
-  pte_t *pte;
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+    int flag = is_cow(pagetable, va0);
+    if (flag < 0) {
+      // not valid address or read-only
+      return -1;
+    }
+    else if (flag == 0) {
+      // writable
+    }
+    else {
+      // copy-on-write page
+      pte_t *pte = walk(pagetable, va0, 0);
+      if (cow_alloc(pte) == 0)
+        return -1;
+    }
     pa0 = walkaddr(pagetable, va0);
-    // validate every va in the range
-    if (pa0 == 0)
-      return -1;
-
-    pte = walk(pagetable, va0, 0);
-    // if dest page is cow, call page fault handler to allocate new page
-    if ((*pte & PTE_COW) && cow_handler(pagetable, va0) < 0)
-      return -1;
-    pa0 = walkaddr(pagetable, va0);   // update phyical address for cow case
 
     n = PGSIZE - (dstva - va0);
     if(n > len)
@@ -453,34 +457,43 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-// given the pgtbl and faulting virtual address,
-// handler allocates a new write page and copies the memory, update the pgtbl,
-// and reset the write and cow bits. return -1 if error
+// Given the pte of cow page, allocate a new physical page, update the pte,
+// reset cow page to writable flag.
+// Return the address of the same pte if success, 0 if error
+void*
+cow_alloc(pte_t *pte) {
+  if (*pte == 0 || (*pte & PTE_V) == 0)
+    return 0;
+  if ((*pte & PTE_COW) == 0)
+    return 0;
+
+  uint64 new_pa = (uint64)kalloc(); // allocate a new page
+  if (new_pa == 0) {
+    // memory not enough
+    return 0;
+  }
+
+  uint64 old_pa = PTE2PA(*pte);
+  memmove((void *)new_pa, (void *)old_pa, PGSIZE);  // copy page
+  kfree((void *)old_pa);    // ref--, free the old page if ref=0
+
+  *pte &= ~PTE_COW; // clear cow flag
+  *pte |= PTE_W; // set write flag back
+  *pte = PA2PTE(new_pa) | PTE_FLAGS(*pte);
+
+  return pte;
+}
+
+// given pagetable and virtual address,
+// return 1 if the page at va is cow, 0 if not, -1 if not valid or read-only
 int
-cow_handler(pagetable_t pagetable, uint64 va) {
+is_cow(pagetable_t pagetable, uint64 va) {
+  // is va valid address?
+  if (walkaddr(pagetable, va) == 0)
+    return -1;
   pte_t* pte;
-  uint64 old_pa = walkaddr(pagetable, va);
-  if (old_pa == 0)
-    return -1;
-
-  // get the pte of faulting va
   pte = walk(pagetable, va, 0);
-  if (*pte & PTE_COW) {
-    uint64 new_pa = (uint64)kalloc(); // allocate a new page
-    if (new_pa == 0) {
-      // memory not enough
-      return -1;
-    }
-
-    memmove((void *)new_pa, (void *)old_pa, PGSIZE);  // copy page
-    kfree((void *)old_pa);    // ref--, free the old page if ref=0
-
-    *pte &= ~PTE_COW; // clear cow flag
-    *pte |= PTE_W; // set write flag back
-    *pte = PA2PTE(new_pa) | PTE_FLAGS(*pte);
-  }
-  else {
-    return -1;
-  }
-  return 0;
+  if (*pte & PTE_COW)
+    return 1;
+  return (*pte & PTE_W)? 0 : -1;
 }
