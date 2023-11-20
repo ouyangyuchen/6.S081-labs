@@ -12,9 +12,7 @@ So next, a store instruction in user code causes a store page fault `scause = 1
 
 Now the question comes, *how can you decide the page is originally read-only or r/w?* So we need to do something in the `uvmcopy()` so that it is easy to distinguish the type. My solution is using a bit in the RSW area:
 
-![64-bit page table entry in risc-v](Lab%20Copy-on-Write%20b3828e500f044ab6a420edf4ee37d404/Untitled.png)
-
-64-bit page table entry in risc-v
+![64-bit page table entry in risc-v](./assets/pte.png)
 
 ```c
 #define PTE_COW (1L << 8)    // 1: cow page, 0: read-only page
