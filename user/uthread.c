@@ -12,6 +12,7 @@
 
 
 struct thread {
+  char       reg[112];          /* the thread's registers saved here */
   char       stack[STACK_SIZE]; /* the thread's stack */
   int        state;             /* FREE, RUNNING, RUNNABLE */
 };
@@ -62,6 +63,7 @@ thread_schedule(void)
      * Invoke thread_switch to switch from t to next_thread:
      * thread_switch(??, ??);
      */
+    thread_switch((uint64)t->reg, (uint64)next_thread->reg);
   } else
     next_thread = 0;
 }
@@ -76,6 +78,9 @@ thread_create(void (*func)())
   }
   t->state = RUNNABLE;
   // YOUR CODE HERE
+  // initialize sp -> t.stack
+  *(uint64 *)(t->reg) = (uint64)func;   // save ra = thread function
+  *(uint64 *)(t->reg + 8) = (uint64)(t->stack + STACK_SIZE);   // save sp = thread stack
 }
 
 void 
