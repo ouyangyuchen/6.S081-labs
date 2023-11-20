@@ -10,7 +10,7 @@ use pipes to transmit prime numbers
 
 I set up a state machine for **all child processes**:
 
-![Untitled](assets/prime_sm.png)
+![Untitled](../assets/prime_sm.png)
 
 Note:
 
