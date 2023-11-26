@@ -19,7 +19,7 @@ static struct mbuf *rx_mbufs[RX_RING_SIZE];
 // remember where the e1000's registers live.
 static volatile uint32 *regs;
 
-struct spinlock e1000_lock;
+struct spinlock e1000_lock_rx, e1000_lock_tx;
 
 // called by pci_init().
 // xregs is the memory address at which the
@@ -29,7 +29,8 @@ e1000_init(uint32 *xregs)
 {
   int i;
 
-  initlock(&e1000_lock, "e1000");
+  initlock(&e1000_lock_rx, "e1000 rx");
+  initlock(&e1000_lock_tx, "e1000 tx");
 
   regs = xregs;
 
@@ -102,10 +103,13 @@ e1000_transmit(struct mbuf *m)
   // the TX descriptor ring so that the e1000 sends it. Stash
   // a pointer so that it can be freed after sending.
   //
+  acquire(&e1000_lock_tx);
+
   uint32 tail = regs[E1000_TDT];
   if ((tx_ring[tail].status & E1000_TXD_STAT_DD) == 0) {
     // e1000 hasn't transmitted this packet yet
-    release(&e1000_lock);
+    release(&e1000_lock_tx);
+    printf("out of the transmit driver\n");
     return -1;
   }
 
@@ -124,6 +128,8 @@ e1000_transmit(struct mbuf *m)
   tx_ring[tail].cmd |= (E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP);
 
   regs[E1000_TDT] = (tail + 1) % TX_RING_SIZE;   // update tail pointer
+
+  release(&e1000_lock_tx);
   
   return 0;
 }
@@ -138,6 +144,7 @@ e1000_recv(void)
   // Create and deliver an mbuf for each packet (using net_rx()).
   //
 
+  acquire(&e1000_lock_rx);
   while (1) {
     uint32 tail = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
     if ((rx_ring[tail].status & E1000_RXD_STAT_DD) == 0) {
@@ -158,6 +165,8 @@ e1000_recv(void)
     // update tail pointer
     regs[E1000_RDT] = tail;
   }
+
+  release(&e1000_lock_rx);
 
 }
 
