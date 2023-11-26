@@ -102,6 +102,28 @@ e1000_transmit(struct mbuf *m)
   // the TX descriptor ring so that the e1000 sends it. Stash
   // a pointer so that it can be freed after sending.
   //
+  uint32 tail = regs[E1000_TDT];
+  if ((tx_ring[tail].status & E1000_TXD_STAT_DD) == 0) {
+    // e1000 hasn't transmitted this packet yet
+    release(&e1000_lock);
+    return -1;
+  }
+
+  if (tx_mbufs[tail]) {
+    // free the old buffer
+    mbuffree(tx_mbufs[tail]);
+    // tx_mbufs[tail] = 0;
+  }
+
+  // load the buffer to ring
+  tx_mbufs[tail] = m;
+  tx_ring[tail].addr = (uint64)m->head;
+  tx_ring[tail].length = m->len;
+  // RS: report status information (for E1000_TXD_STAT_DD)
+  // EOP: end of packet
+  tx_ring[tail].cmd |= (E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP);
+
+  regs[E1000_TDT] = (tail + 1) % TX_RING_SIZE;   // update tail pointer
   
   return 0;
 }
@@ -115,6 +137,28 @@ e1000_recv(void)
   // Check for packets that have arrived from the e1000
   // Create and deliver an mbuf for each packet (using net_rx()).
   //
+
+  while (1) {
+    uint32 tail = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
+    if ((rx_ring[tail].status & E1000_RXD_STAT_DD) == 0) {
+      // is avaible to read?
+      break;
+    }
+
+    rx_mbufs[tail]->len = rx_ring[tail].length;
+    net_rx(rx_mbufs[tail]);   // deliver this package to net stack
+
+    // rx_mbufs[tail] has been freed, reallocate a new buffer
+    rx_mbufs[tail] = mbufalloc(0);
+    if (rx_mbufs[tail] == 0)
+      panic("e1000 receive");
+    rx_ring[tail].addr = (uint64)rx_mbufs[tail]->head;
+    rx_ring[tail].status = 0;
+
+    // update tail pointer
+    regs[E1000_RDT] = tail;
+  }
+
 }
 
 void
