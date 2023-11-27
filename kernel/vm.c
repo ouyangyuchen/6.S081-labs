@@ -329,7 +329,9 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       *new_pte |= PTE_COW;
     }
     // phyical page reference +1
+    acquire(&ref_lock);
     refcnt[REFINDEX(pa)]++;
+    release(&ref_lock);
   }
   return 0;
 

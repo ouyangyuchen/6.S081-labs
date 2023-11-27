@@ -63,6 +63,7 @@ void            ramdiskrw(struct buf*);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
+extern struct spinlock ref_lock;
 extern int      refcnt[];
 #define         REFINDEX(pa) ((pa - KERNBASE) >> 12)
 
