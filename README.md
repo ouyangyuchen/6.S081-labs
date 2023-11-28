@@ -1,7 +1,17 @@
 # 6.S081 Labs
 Lab solutions and notes from MIT 6.S081 course in 2021 Fall. 
 
-`master` branch only keeps the [notes](https://github.com/ouyangyuchen/6.S081-labs/tree/master/notes). Please switch the branch if you want to check source code for the corresponding lab.
+I used [Notion](https://www.notion.so/) to record my thoughts and answers for each lab assignment. Welcome to look at my [**notes**](https://oyyc.notion.site/6-S081-5ceb145d86904531a37d943b14f83779?pvs=4) (in English) and leave your comments!
+
+1. [Lab Utilities](https://oyyc.notion.site/Lab-Utilities-5722b13bd946445ea5633c453fd9dec5?pvs=4)
+2. [Lab System Calls](https://oyyc.notion.site/Lab-System-Calls-ed3d517cd55b4aaabb81b4ad484dd64a?pvs=4)
+3. [Lab Page Tables](https://oyyc.notion.site/Lab-Page-Tables-7a6f3736064b421ba81408f39424fb19?pvs=4)
+4. [Lab Traps](https://oyyc.notion.site/Lab-Traps-85b9f6a754924aeda70b375aec0d1103?pvs=4)
+5. [Lab Copy-on-Write](https://oyyc.notion.site/Lab-Copy-on-Write-b3828e500f044ab6a420edf4ee37d404?pvs=4)
+6. [Lab Multithreading](https://oyyc.notion.site/Lab-Multithreading-5f3c6a17dc4643b1a9ba9a60dcfa5ebc?pvs=4)
+7. [Lab Network Driver](https://oyyc.notion.site/Lab-Network-Driver-fe631ec0c2c54a1183d398911da06bed?pvs=4)
+
+Please switch the branch if you want to check the source code for the corresponding lab.
 
 ## About this course
 - *tags*: **operating system**, **risc-v**, **C**
@@ -15,12 +25,3 @@ Lab solutions and notes from MIT 6.S081 course in 2021 Fall.
 - [QEMU Manual](https://wiki.qemu.org/Documentation), risc-v machine emulation platform
 - [6.S081 课程中文翻译](https://mit-public-courses-cn-translatio.gitbook.io/mit6-s081/)
 
-## Notes and Answers
-Here are my notes where you can find the hints and my solutions for each lab.
-
-1. [Lab Utilities](https://github.com/ouyangyuchen/6.S081-labs/blob/master/notes/utils.md)
-2. [Lab System Calls](https://github.com/ouyangyuchen/6.S081-labs/blob/master/notes/syscall.md)
-3. [Lab Page Tables](https://github.com/ouyangyuchen/6.S081-labs/blob/master/notes/pgtbl.md)
-4. [Lab Traps](https://github.com/ouyangyuchen/6.S081-labs/blob/master/notes/traps.md)
-5. [Lab Copy-on-Write](https://github.com/ouyangyuchen/6.S081-labs/blob/master/notes/cow.md)
-6. [Lab Multithreading](https://github.com/ouyangyuchen/6.S081-labs/blob/master/notes/thread.md)
