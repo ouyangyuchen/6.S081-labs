@@ -23,75 +23,136 @@
 #include "fs.h"
 #include "buf.h"
 
+#define BUCKNUM 29
+
+struct bucket {
+  struct spinlock lock;
+  struct buf *head;
+};
+
 struct {
   struct spinlock lock;
   struct buf buf[NBUF];
 
-  // Linked list of all buffers, through prev/next.
-  // Sorted by how recently the buffer was used.
-  // head.next is most recent, head.prev is least.
-  struct buf head;
+  struct bucket table[BUCKNUM];
 } bcache;
 
-void
-binit(void)
-{
+int hash(uint dev, uint blockno) { return (dev * 67 + blockno) % BUCKNUM; }
+
+// Insert buffer into the given bucket
+// Caller must have bucket lock
+void insert_head(int index, struct buf *buf) {
+  if (index < 0 || index >= BUCKNUM)
+    panic("insert_head: index out of bound");
+  buf->next = bcache.table[index].head;
+  bcache.table[index].head = buf;
+}
+
+// Select an empty buffer with the smallest ticks and remove it from the original list
+// Return 0 if cache is full, else return the buffer with bucket locked
+// Must be called without any bucket locks or bcache lock
+struct buf *evict() {
+  struct buf *bp;
+  uint record = ~0x0;
+  struct buf *record_ptr = 0;
+
+  acquire(&bcache.lock);
+
+  // find the buffer with the smallest ticks
+  for (int i = 0; i < BUCKNUM; i++) {
+    acquire(&bcache.table[i].lock);
+    for (bp = bcache.table[i].head; bp != 0; bp = bp->next) {
+      if (bp->refcnt == 0) {
+        if (bp->ticks < record) {
+          record = bp->ticks;
+          record_ptr = bp;
+        }
+      }
+    }
+    release(&bcache.table[i].lock);
+  }
+
+  if (record_ptr == 0) {
+    release(&bcache.lock);
+    return 0;
+  }
+
+  // remove it from the original list
+  struct buf **ptr;
+  for (int i = 0; i < BUCKNUM; i++) {
+    acquire(&bcache.table[i].lock);
+    for (ptr = &bcache.table[i].head; *ptr != 0; ptr = &((*ptr)->next)) {
+      if (*ptr == record_ptr) {
+        *ptr = (*ptr)->next;
+        release(&bcache.table[i].lock);
+        release(&bcache.lock);
+        return record_ptr;
+      }
+    }
+    release(&bcache.table[i].lock);
+  }
+  panic("evict");
+}
+
+void binit(void) {
   struct buf *b;
 
   initlock(&bcache.lock, "bcache");
 
-  // Create linked list of buffers
-  bcache.head.prev = &bcache.head;
-  bcache.head.next = &bcache.head;
-  for(b = bcache.buf; b < bcache.buf+NBUF; b++){
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
+  for (int i = 0; i < BUCKNUM; i++) {
+    initlock(&bcache.table[i].lock, "bcache");
+    bcache.table[i].head = 0;
+  }
+
+  for (b = bcache.buf; b < bcache.buf + NBUF; b++) {
+    b->refcnt = 0;
     initsleeplock(&b->lock, "buffer");
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
+    insert_head(0, b);    // attach all buffers to the 0 bucket
   }
 }
 
 // Look through buffer cache for block on device dev.
 // If not found, allocate a buffer.
 // In either case, return locked buffer.
-static struct buf*
-bget(uint dev, uint blockno)
-{
+static struct buf *bget(uint dev, uint blockno) {
   struct buf *b;
 
-  acquire(&bcache.lock);
+  int id = hash(dev, blockno);
 
-  // Is the block already cached?
-  for(b = bcache.head.next; b != &bcache.head; b = b->next){
-    if(b->dev == dev && b->blockno == blockno){
+  // visit the specific bucket, instead of the whole cache
+  acquire(&bcache.table[id].lock);
+  for (b = bcache.table[id].head; b != 0; b = b->next) {
+    if (b->dev == dev && b->blockno == blockno) {
+      // found
       b->refcnt++;
-      release(&bcache.lock);
+      release(&bcache.table[id].lock);
+
       acquiresleep(&b->lock);
       return b;
     }
   }
+  release(&bcache.table[id].lock);  // unlock for eviction
 
   // Not cached.
-  // Recycle the least recently used (LRU) unused buffer.
-  for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
-    if(b->refcnt == 0) {
-      b->dev = dev;
-      b->blockno = blockno;
-      b->valid = 0;
-      b->refcnt = 1;
-      release(&bcache.lock);
-      acquiresleep(&b->lock);
-      return b;
-    }
+  b = evict();  // find the evicted buffer
+  if (b) {
+    acquire(&bcache.table[id].lock);
+    insert_head(id, b);                 // insert to the current list
+
+    b->dev = dev;
+    b->blockno = blockno;
+    b->valid = 0;
+    b->refcnt = 1;
+
+    release(&bcache.table[id].lock);
+    acquiresleep(&b->lock);
+    return b;
   }
   panic("bget: no buffers");
 }
 
 // Return a locked buf with the contents of the indicated block.
-struct buf*
-bread(uint dev, uint blockno)
-{
+struct buf *bread(uint dev, uint blockno) {
   struct buf *b;
 
   b = bget(dev, blockno);
@@ -121,33 +182,30 @@ brelse(struct buf *b)
 
   releasesleep(&b->lock);
 
-  acquire(&bcache.lock);
+  int id = hash(b->dev, b->blockno);
+
+  acquire(&bcache.table[id].lock);
   b->refcnt--;
   if (b->refcnt == 0) {
     // no one is waiting for it.
-    b->next->prev = b->prev;
-    b->prev->next = b->next;
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
+    b->ticks = ticks;
   }
-  
-  release(&bcache.lock);
+
+  release(&bcache.table[id].lock);
 }
 
 void
 bpin(struct buf *b) {
-  acquire(&bcache.lock);
+  int id = hash(b->dev, b->blockno);
+  acquire(&bcache.table[id].lock);
   b->refcnt++;
-  release(&bcache.lock);
+  release(&bcache.table[id].lock);
 }
 
 void
 bunpin(struct buf *b) {
-  acquire(&bcache.lock);
+  int id = hash(b->dev, b->blockno);
+  acquire(&bcache.table[id].lock);
   b->refcnt--;
-  release(&bcache.lock);
+  release(&bcache.table[id].lock);
 }
-
-
