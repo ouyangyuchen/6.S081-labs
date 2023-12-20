@@ -58,6 +58,7 @@ struct buf *evict() {
 
   acquire(&bcache.lock);
 
+restart:
   // find the buffer with the smallest ticks
   for (int i = 0; i < BUCKNUM; i++) {
     acquire(&bcache.table[i].lock);
@@ -79,18 +80,21 @@ struct buf *evict() {
 
   // remove it from the original list
   struct buf **ptr;
-  for (int i = 0; i < BUCKNUM; i++) {
-    acquire(&bcache.table[i].lock);
-    for (ptr = &bcache.table[i].head; *ptr != 0; ptr = &((*ptr)->next)) {
-      if (*ptr == record_ptr) {
-        *ptr = (*ptr)->next;
-        release(&bcache.table[i].lock);
-        release(&bcache.lock);
-        return record_ptr;
+  int id = hash(record_ptr->dev, record_ptr->blockno);
+  acquire(&bcache.table[id].lock);
+  for (ptr = &bcache.table[id].head; *ptr != 0; ptr = &((*ptr)->next)) {
+    if (*ptr == record_ptr) {
+      if (record_ptr->refcnt > 0) {
+        release(&bcache.table[id].lock);
+        goto restart;
       }
+      *ptr = (*ptr)->next;
+      release(&bcache.table[id].lock);
+      release(&bcache.lock);
+      return record_ptr;
     }
-    release(&bcache.table[i].lock);
   }
+  release(&bcache.table[id].lock);
   panic("evict");
 }
 
