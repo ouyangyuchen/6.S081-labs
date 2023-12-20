@@ -10,6 +10,7 @@ I used [Notion](https://www.notion.so/) to record my thoughts and answers for ea
 5. [Lab Copy-on-Write](https://oyyc.notion.site/Lab-Copy-on-Write-b3828e500f044ab6a420edf4ee37d404?pvs=4)
 6. [Lab Multithreading](https://oyyc.notion.site/Lab-Multithreading-5f3c6a17dc4643b1a9ba9a60dcfa5ebc?pvs=4)
 7. [Lab Network Driver](https://oyyc.notion.site/Lab-Network-Driver-fe631ec0c2c54a1183d398911da06bed?pvs=4)
+8. [Lab Lock](https://oyyc.notion.site/Lab-Lock-2ac99dd68ac64b019d11ae9f68e48ea4?pvs=4)
 
 Please switch the branch if you want to check the source code for the corresponding lab.
 
