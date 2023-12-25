@@ -283,6 +283,34 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
+uint64 sys_symlink(void)
+{
+  char target[MAXPATH];
+  char path[MAXPATH];
+  uint tlen, plen;
+  struct inode *ip;
+
+  if ((tlen = argstr(0, target, MAXPATH)) < 0 || (plen = argstr(1, path, MAXPATH)) < 0)
+    return -1;
+
+  begin_op();
+
+  if ((ip = create(path, T_SYMLINK, 0, 0)) == 0) {
+    end_op();
+    return -1;
+  }
+
+  // ilock(ip);
+  if (writei(ip, 0, (uint64)target, 0, tlen) != tlen) {
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+  iunlockput(ip);
+  end_op();
+  return 0;
+}
+
 uint64
 sys_open(void)
 {
@@ -313,6 +341,39 @@ sys_open(void)
       iunlockput(ip);
       end_op();
       return -1;
+    } else if (ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)) {
+      char temp_path[MAXPATH];
+      int cnt = 10;
+      while (cnt > 0) {
+        // read the target path
+        if (readi(ip, 0, (uint64)temp_path, 0, ip->size) != ip->size) {
+          iunlockput(ip);
+          end_op();
+          return -1;
+        } 
+        // find the corresponding file
+        iunlock(ip);
+        if ((ip = namei(temp_path)) == 0) {
+          // target file not exists
+          end_op();
+          return -1;
+        }
+        ilock(ip);
+        // based on the file type, operate differently
+        if (ip->type == T_FILE) {
+          break;
+        } else if (ip->type == T_DIR) {
+          panic("open symlink to a directory");
+        } else if (ip->type == T_SYMLINK) {
+          cnt--;
+        }
+      }
+      if (cnt == 0) {
+        // the following count has passed the threshold -> cyclic links
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
     }
   }
 
