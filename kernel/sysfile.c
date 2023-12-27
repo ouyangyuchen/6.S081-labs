@@ -484,3 +484,68 @@ sys_pipe(void)
   }
   return 0;
 }
+
+static void*
+mmap(void *addr, int length, int prot, int flags, int fd, int offset)
+{
+  if ((addr = findarea(length)) == 0) {
+    // no area is available
+    printf("mmap: no area is available\n");
+    return 0;
+  }
+
+  // allocate a new vma struct
+  struct proc *p = myproc();
+  struct vma *area = vma_alloc();
+  if (area == 0)
+    panic("mmap: no free entry");
+  area->start = addr;
+  area->length = length;
+  area->permissions = prot;
+  area->shared = flags;
+  // validate fd
+  if (fd < 0 || fd >= 16 || p->ofile[fd] == 0) {
+    goto bad;
+  }
+  area->fp = p->ofile[fd];
+
+  // Add this struct to the process's mmap table
+  for (int i = 0; i < 16; i++) {
+    if (p->mmapareas[i] == 0) {
+      p->mmapareas[i] = area;
+      filedup(area->fp);
+      printf("mmap: start = %p, end = %p\n", area->start, (char *)area->start + area->length);
+      return area->start;
+    }
+  }
+
+bad:
+  if (vma_free(area) < 0)
+    panic("mmap: vma free error");
+  return 0;
+}
+
+uint64
+sys_mmap(void) {
+  uint64 addr;
+  int length, prot, flags, fd, offset;
+
+  if (argaddr(0, &addr) < 0)
+    return -1;
+  if (argint(1, &length) < 0)
+    return -1;
+  if (argint(2, &prot) < 0)
+    return -1;
+  if (argint(3, &flags) < 0)
+    return -1;
+  if (argint(4, &fd) < 0)
+    return -1;
+  if (argint(5, &offset) < 0)
+    return -1;
+  return (uint64)mmap((void *)addr, length, prot, flags, fd, offset);
+}
+
+uint64
+sys_munmap(void) {
+  return -1;
+}

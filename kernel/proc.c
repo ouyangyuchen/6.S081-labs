@@ -12,6 +12,85 @@ struct proc proc[NPROC];
 
 struct proc *initproc;
 
+static struct vma vmareas[16];
+static struct spinlock vma_lock;
+
+// allocate vma area in the array
+// return 0 if error
+struct vma *
+vma_alloc() {
+  acquire(&vma_lock);
+
+  for (int i = 0; i < 16; i++) {
+    // check whether the entry is free
+    if (vmareas[i].valid == 0) {
+      vmareas[i].valid = 1;
+      release(&vma_lock);
+      return &vmareas[i];
+    }
+  }
+
+  // no free entries in the vma array
+  release(&vma_lock);
+  return 0;
+}
+
+int
+vma_free(struct vma *area) {
+  if (area == 0)
+    return -1;
+
+  acquire(&vma_lock);
+  if (area->valid == 0)
+    panic("vma free a freed entry");
+  area->valid = 0;
+  release(&vma_lock);
+  return 0;
+}
+
+// Return the area pointer if va is in one of the mapped areas
+struct vma *
+whicharea(void *va) {
+  struct proc *p = myproc();
+  for (int i = 0; i < 16; i++) {
+    if (p->mmapareas[i] && p->mmapareas[i]->valid) {
+      uint64 start = (uint64)p->mmapareas[i]->start;
+      if ((uint64)va >= start && (uint64)va < start + p->mmapareas[i]->length)
+        return p->mmapareas[i];
+    }
+  }
+  return 0;
+}
+
+// Look up the process's page table for a free region used in mmap()
+// Return the beginning virtual address or 0 if no area is available
+void *
+findarea(int size) {
+  // how many pages at most should the process allocate for this file
+  int max_pages = (size + PGSIZE - 1) / PGSIZE;
+
+  struct proc *p = myproc();
+
+  uint64 va = (uint64)p->trapframe - PGSIZE;
+  int avail_pages = 0;
+  for (; va > p->sz; va -= PGSIZE) {
+    if (whicharea((void *)va) != 0) {
+      // has been mapped to a vmarea
+      continue;
+    }
+    if (walkaddr(p->pagetable, va) == 0) {
+      // not in the heap area, increment the available page counter
+      if (++avail_pages == max_pages)
+        return (void *)va;
+    }
+    else {
+      // the mmaped area has gone beyond the heap
+      return 0;
+    }
+  }
+  return 0;
+}
+
 int nextpid = 1;
 struct spinlock pid_lock;
 
@@ -50,6 +129,7 @@ procinit(void)
   
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
+  initlock(&vma_lock, "mmap areas lock");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->kstack = KSTACK((int) (p - proc));
@@ -119,6 +199,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  memset(&p->mmapareas, 0, sizeof(p->mmapareas));
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){

@@ -26,6 +26,15 @@ struct cpu {
   int intena;                 // Were interrupts enabled before push_off()?
 };
 
+struct vma {
+  int valid;
+  void *start;
+  int length;
+  int permissions;
+  int shared;
+  struct file *fp;
+};
+
 extern struct cpu cpus[NCPU];
 
 // per-process data for the trap handling code in trampoline.S.
@@ -105,4 +114,5 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  struct vma *mmapareas[16];   // Virtual Memory-Mapped areas
 };
