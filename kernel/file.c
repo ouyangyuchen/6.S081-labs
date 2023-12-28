@@ -183,7 +183,6 @@ filewrite(struct file *f, uint64 addr, int n)
 int
 filewrite_off(struct file *f, int off, uint64 addr, int n)
 {
-  printf("munmap: file write at off = %d, len = %d, size = %d\n", off, n, f->ip->size);
   int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
   int i = 0, r = 0;
   while (i < n) {
@@ -200,7 +199,6 @@ filewrite_off(struct file *f, int off, uint64 addr, int n)
 
     if (r != n1) {
       // error from writei
-      printf("r = %d \t", r);
       break;
     }
     i += r;

@@ -485,7 +485,7 @@ sys_pipe(void)
   return 0;
 }
 
-static void*
+void*
 mmap(void *addr, int length, int prot, int flags, int fd, int offset)
 {
   if ((addr = findarea(length)) == 0) {
@@ -549,7 +549,7 @@ sys_mmap(void) {
   return (uint64)mmap((void *)addr, length, prot, flags, fd, offset);
 }
 
-static int
+int
 munmap(uint64 addr, int length) {
   // unmap range is either at start, at end or the whole area
   struct vma *range = whicharea((void *)addr);

@@ -382,6 +382,25 @@ fork(void)
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
 
+  // copy parent's mmaped table
+  for (int i = 0; i < 16; i++) {
+    if (p->mmapareas[i]) {
+      struct vma *area = vma_alloc();   // allocate a new entry
+      if (area == 0)
+        panic("fork: copy mmap table");
+      // Add to the child's table
+      for (int i = 0; i < 16; i++) {
+        if (np->mmapareas[i] == 0) {
+          np->mmapareas[i] = area;
+          break;
+        }
+      }
+      // copy area information
+      memmove(area, p->mmapareas[i], sizeof(*area));
+      filedup(area->fp);
+    }
+  }
+
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
@@ -431,6 +450,14 @@ exit(int status)
       struct file *f = p->ofile[fd];
       fileclose(f);
       p->ofile[fd] = 0;
+    }
+  }
+
+  // unmap all mmaped areas
+  for (int i = 0; i < 16; i++) {
+    if (p->mmapareas[i]) {
+      munmap(p->mmapareas[i]->addr, p->mmapareas[i]->length);
+      p->mmapareas[i] = 0;
     }
   }
 
