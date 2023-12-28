@@ -186,6 +186,31 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   }
 }
 
+// Remove npages of mappings starting from va. va must be
+// page-aligned. The mappings may not exist.
+// Free the physical memory.
+void
+uvmunmap_pass(pagetable_t pagetable, uint64 va, uint64 npages)
+{
+  uint64 a;
+  pte_t *pte;
+
+  if((va % PGSIZE) != 0)
+    panic("uvmunmap: not aligned");
+
+  for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
+    if((pte = walk(pagetable, a, 0)) == 0)
+      continue;
+    if((*pte & PTE_V) == 0)
+      continue;
+    if(PTE_FLAGS(*pte) == PTE_V)
+      continue;
+    uint64 pa = PTE2PA(*pte);
+    kfree((void *)pa);
+    *pte = 0;
+  }
+}
+
 // create an empty user page table.
 // returns 0 if out of memory.
 pagetable_t
@@ -376,8 +401,10 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
   while(len > 0){
     va0 = PGROUNDDOWN(srcva);
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
+    if(pa0 == 0) {
+      printf("va = %p\n", va0);
       return -1;
+    }
     n = PGSIZE - (srcva - va0);
     if(n > len)
       n = len;

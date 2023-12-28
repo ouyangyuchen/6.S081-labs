@@ -180,3 +180,30 @@ filewrite(struct file *f, uint64 addr, int n)
   return ret;
 }
 
+int
+filewrite_off(struct file *f, int off, uint64 addr, int n)
+{
+  printf("munmap: file write at off = %d, len = %d, size = %d\n", off, n, f->ip->size);
+  int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
+  int i = 0, r = 0;
+  while (i < n) {
+    int n1 = n - i;
+    if (n1 > max)
+      n1 = max;
+
+    begin_op();
+    ilock(f->ip);
+    if ((r = writei(f->ip, 1, addr + i, off, n1)) > 0)
+      off += r;
+    iunlock(f->ip);
+    end_op();
+
+    if (r != n1) {
+      // error from writei
+      printf("r = %d \t", r);
+      break;
+    }
+    i += r;
+  }
+  return i;
+}

@@ -28,7 +28,8 @@ struct cpu {
 
 struct vma {
   int valid;
-  void *start;
+  uint64 start;
+  uint64 addr;
   int length;
   int permissions;
   int shared;

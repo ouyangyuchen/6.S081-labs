@@ -54,7 +54,7 @@ whicharea(void *va) {
   struct proc *p = myproc();
   for (int i = 0; i < 16; i++) {
     if (p->mmapareas[i] && p->mmapareas[i]->valid) {
-      uint64 start = (uint64)p->mmapareas[i]->start;
+      uint64 start = (uint64)p->mmapareas[i]->addr;
       if ((uint64)va >= start && (uint64)va < start + p->mmapareas[i]->length)
         return p->mmapareas[i];
     }

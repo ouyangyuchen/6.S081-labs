@@ -46,7 +46,7 @@ pgfault_mmap(uint64 fva, int write) {
   int off = va - (uint64)area->start;
   struct inode *ip = area->fp->ip;
   ilock(ip);
-  if (readi(ip, 0, (uint64)mem, off, PGSIZE) <= 0) {
+  if (off < ip->size && readi(ip, 0, (uint64)mem, off, PGSIZE) <= 0) {
     kfree(mem);
     iunlock(ip);
     return -1;

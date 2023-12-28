@@ -491,7 +491,7 @@ mmap(void *addr, int length, int prot, int flags, int fd, int offset)
   if ((addr = findarea(length)) == 0) {
     // no area is available
     printf("mmap: no area is available\n");
-    return 0;
+    return (char *)-1;
   }
 
   // allocate a new vma struct
@@ -499,30 +499,34 @@ mmap(void *addr, int length, int prot, int flags, int fd, int offset)
   struct vma *area = vma_alloc();
   if (area == 0)
     panic("mmap: no free entry");
-  area->start = addr;
+  area->start = area->addr = (uint64)addr;
   area->length = length;
-  area->permissions = prot;
   area->shared = flags;
   // validate fd
-  if (fd < 0 || fd >= 16 || p->ofile[fd] == 0) {
+  if (fd < 0 || fd >= 16 || p->ofile[fd] == 0 || p->ofile[fd]->type != FD_INODE) {
     goto bad;
   }
   area->fp = p->ofile[fd];
+  // validate r/w permissions: read-only mmap allows for PRIVATE, not SHARED
+  if ((prot & PROT_READ) && !(area->fp->readable))
+    goto bad;
+  else if ((prot & PROT_WRITE) && !(area->fp->writable) && (flags & MAP_SHARED))
+    goto bad;
+  area->permissions = prot;
 
   // Add this struct to the process's mmap table
   for (int i = 0; i < 16; i++) {
     if (p->mmapareas[i] == 0) {
       p->mmapareas[i] = area;
       filedup(area->fp);
-      printf("mmap: start = %p, end = %p\n", area->start, (char *)area->start + area->length);
-      return area->start;
+      return (void *)area->addr;
     }
   }
 
 bad:
   if (vma_free(area) < 0)
     panic("mmap: vma free error");
-  return 0;
+  return (char *)-1;
 }
 
 uint64
@@ -545,7 +549,66 @@ sys_mmap(void) {
   return (uint64)mmap((void *)addr, length, prot, flags, fd, offset);
 }
 
+static int
+munmap(uint64 addr, int length) {
+  // unmap range is either at start, at end or the whole area
+  struct vma *range = whicharea((void *)addr);
+  if (range == 0) {
+    return -1;
+  }
+
+  uint64 start, end;  // remaining valid range
+  uint64 free_start;  // the starting address of freed page
+  int npages;         // number of pages to be freed
+  struct proc *p = myproc();
+  if (addr + length == range->addr + range->length && length <= range->length) {
+    // until the ending address
+    start = range->addr;
+    end = addr;
+    free_start = PGROUNDUP(addr);
+    npages = (addr + length - PGROUNDUP(addr) + PGSIZE - 1) / PGSIZE;
+  } else if (addr == range->addr && length < range->length) {
+    // from the starting address
+    start = addr + length;
+    end = range->addr + range->length;
+    free_start = addr;
+    npages = length / PGSIZE;
+  } else {
+    // out of range
+    return -1;
+  }
+
+  // write modified pages back to file & free memory
+  if (range->shared & MAP_SHARED) {
+    filewrite_off(range->fp, addr - range->start, addr, length);
+  }
+  uvmunmap_pass(p->pagetable, free_start, npages); // neglect the unmapped ptes
+
+  // update the mmaped range
+  range->addr = start;
+  range->length = end - start;
+  if (range->length == 0) {
+    // remove the whole range
+    fileclose(range->fp);     // decrement the refcnt
+    // free the vm area entry in the table
+    for (int i = 0; i < 16; i++) {
+      if (p->mmapareas[i] == range)
+        p->mmapareas[i] = 0;
+    }
+    if (vma_free(range) < 0)
+      panic("munmap: vma free");
+  }
+  return 0;
+}
+
 uint64
 sys_munmap(void) {
-  return -1;
+  uint64 addr;
+  int length;
+  if (argaddr(0, &addr) < 0)
+    return -1;
+  if (argint(1, &length) < 0)
+    return -1;
+
+  return munmap(addr, length);
 }
