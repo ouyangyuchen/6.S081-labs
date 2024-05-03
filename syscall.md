@@ -1,6 +1,4 @@
-# Lab System Calls
-
-[specification](https://pdos.csail.mit.edu/6.828/2021/labs/syscall.html)
+# [Lab System Calls](https://pdos.csail.mit.edu/6.828/2021/labs/syscall.html)
 
 This lab shows us how to create a system call and use definitions in kernel code.
 

@@ -1,6 +1,4 @@
-# Lab Multithreading
-
-[specification](https://pdos.csail.mit.edu/6.828/2021/labs/thread.html)
+# [Lab Multithreading](https://pdos.csail.mit.edu/6.828/2021/labs/thread.html)
 
 ## Uthread: switching between threads *(moderate)*
 

@@ -1,6 +1,4 @@
-# Lab Network Driver
-
-[specification](https://pdos.csail.mit.edu/6.828/2021/labs/net.html)
+# [Lab Network Driver](https://pdos.csail.mit.edu/6.828/2021/labs/net.html)
 
 ## Your Job *(hard)*
 

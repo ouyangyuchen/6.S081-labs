@@ -1,4 +1,4 @@
-# Lab Utilities
+# [Lab Utilities](https://pdos.csail.mit.edu/6.828/2021/labs/util.html)
 
 ## primes *(hard)*
 

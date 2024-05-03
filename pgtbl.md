@@ -1,6 +1,4 @@
-# Lab Page Tables
-
-[specification](https://pdos.csail.mit.edu/6.828/2021/labs/pgtbl.html)
+# [Lab Page Tables](https://pdos.csail.mit.edu/6.828/2021/labs/pgtbl.html)
 
 In this lab, the most important reference is `kernel/vm.c`, which relates to the creation, mapping, and freeing of page tables. Three functions are the quite useful in this lab:
 

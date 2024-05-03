@@ -1,6 +1,4 @@
-# Lab Traps
-
-[specification](https://pdos.csail.mit.edu/6.828/2021/labs/traps.html)
+# [Lab Traps](https://pdos.csail.mit.edu/6.828/2021/labs/traps.html)
 
 The `uservec` code in `kernel/trampoline.S` is used for 2 things:
 

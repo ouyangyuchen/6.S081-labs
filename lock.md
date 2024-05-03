@@ -1,6 +1,4 @@
-# Lab Lock
-
-[specification](https://pdos.csail.mit.edu/6.828/2021/labs/lock.html)
+# [Lab Lock](https://pdos.csail.mit.edu/6.828/2021/labs/lock.html)
 
 ## Memory Allocator *(moderate)*
 

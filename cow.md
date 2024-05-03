@@ -1,6 +1,4 @@
-# Lab Copy-on-Write
-
-[specification](https://pdos.csail.mit.edu/6.828/2021/labs/cow.html)
+# [Lab Copy-on-Write](https://pdos.csail.mit.edu/6.828/2021/labs/cow.html)
 
 ## Implement Copy-on-Write ***(hard)***
 

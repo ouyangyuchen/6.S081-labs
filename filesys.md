@@ -1,6 +1,4 @@
-# Lab File System
-
-[specification](https://pdos.csail.mit.edu/6.828/2021/labs/fs.html)
+# [Lab File System](https://pdos.csail.mit.edu/6.828/2021/labs/fs.html)
 
 ## Large Files *(moderate)*
 

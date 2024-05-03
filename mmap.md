@@ -1,6 +1,4 @@
-# Lab Mmap
-
-[specification](https://pdos.csail.mit.edu/6.828/2021/labs/mmap.html)
+# [Lab Mmap](https://pdos.csail.mit.edu/6.828/2021/labs/mmap.html)
 
 ## Mmap *(hard)*
 
